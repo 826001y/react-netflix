@@ -1,7 +1,13 @@
 import { useQuery } from "react-query";
 import styled from "styled-components";
 import { motion, AnimatePresence, useScroll } from "framer-motion";
-import { getMovies, IGetMovieResult } from "../api";
+import {
+  getLatestMovies,
+  getMovies,
+  getTopRatedMovies,
+  getUpcomingMovies,
+  IGetMovieResult,
+} from "../api";
 import { makeImagePath } from "../utils";
 import { useState } from "react";
 import { useHistory, useRouteMatch } from "react-router-dom";
@@ -43,6 +49,11 @@ const Overview = styled.p`
 const Slider = styled.div`
   position: relative;
   top: -100px;
+`;
+
+const SliderTitle = styled.h3`
+  font-size: 25px;
+  padding: 20px;
 `;
 
 const Row = styled(motion.div)`
@@ -91,10 +102,10 @@ const Overlay = styled(motion.div)`
   opacity: 0;
 `;
 
-const BigMovie = styled(motion.div)`
+const Big = styled(motion.div)`
   position: absolute;
-  width: 40vw;
-  height: 80vh;
+  width: 35vw;
+  height: 75vh;
   left: 0;
   right: 0;
   margin: 0 auto;
@@ -169,17 +180,21 @@ function Home() {
   const history = useHistory();
   const bigMovieMatch = useRouteMatch<{ movieId: string }>("/movies/:movieId");
   const { scrollY } = useScroll();
-  const { data, isLoading } = useQuery<IGetMovieResult>(
-    ["movies", "nowPlaying"],
-    getMovies
-  );
+  const { isLoading: loadingNowPlaying, data: playingData } =
+    useQuery<IGetMovieResult>(["nowPlaying"], getMovies);
+  const { isLoading: loadingLatest, data: latestData } =
+    useQuery<IGetMovieResult>(["latest"], getLatestMovies);
+  const { isLoading: loadingTopRated, data: topRatedData } =
+    useQuery<IGetMovieResult>(["topRated"], getTopRatedMovies);
+  const { isLoading: loadingUpComing, data: upComingData } =
+    useQuery<IGetMovieResult>(["upcoming"], getUpcomingMovies);
   const [index, setIndex] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const increaseIndex = () => {
-    if (data) {
+    if (playingData) {
       if (leaving) return;
       toggleLeaving();
-      const totalMovies = data.results.length - 1;
+      const totalMovies = playingData.results.length - 1;
       const maxIndex = Math.floor(totalMovies / offset) - 1;
       setIndex((prev) => (prev === maxIndex ? 0 : prev + 1));
     }
@@ -191,21 +206,24 @@ function Home() {
   const onOverlayClick = () => history.push("/");
   const clickedMovie =
     bigMovieMatch?.params.movieId &&
-    data?.results.find((movie) => movie.id === +bigMovieMatch.params.movieId);
+    playingData?.results.find(
+      (movie) => movie.id === +bigMovieMatch.params.movieId
+    );
   return (
     <Wrapper>
-      {isLoading ? (
+      {loadingNowPlaying ? (
         <Loader>Loading...</Loader>
       ) : (
         <>
           <Banner
             onClick={increaseIndex}
-            bgphoto={makeImagePath(data?.results[0].backdrop_path || "")}
+            bgphoto={makeImagePath(playingData?.results[0].backdrop_path || "")}
           >
-            <Title>{data?.results[0].title}</Title>
-            <Overview>{data?.results[0].overview}</Overview>
+            <Title>{playingData?.results[0].title}</Title>
+            <Overview>{playingData?.results[0].overview}</Overview>
           </Banner>
           <Slider>
+            <SliderTitle>Now Playing</SliderTitle>
             <AnimatePresence initial={false} onExitComplete={toggleLeaving}>
               <Row
                 variants={rowVariants}
@@ -215,7 +233,7 @@ function Home() {
                 transition={{ type: "tween", duration: 1 }}
                 key={index}
               >
-                {data?.results
+                {playingData?.results
                   .slice(1)
                   .slice(offset * index, offset * index + offset)
                   .map((movie) => (
@@ -245,7 +263,7 @@ function Home() {
                   exit={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                 />
-                <BigMovie
+                <Big
                   style={{ top: scrollY.get() + 100 }}
                   layoutId={bigMovieMatch.params.movieId}
                 >
@@ -263,7 +281,7 @@ function Home() {
                       <BigOverView>{clickedMovie.overview}</BigOverView>
                     </>
                   )}
-                </BigMovie>
+                </Big>
               </>
             ) : null}
           </AnimatePresence>
